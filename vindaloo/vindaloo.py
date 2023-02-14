@@ -231,6 +231,7 @@ class Vindaloo:
                 )
 
         if self.args.watch:
+            failed_deployments = []
             for yaml_conf in self.config_module.K8S_OBJECTS.get('deployment', []):
                 if isinstance(yaml_conf, JsonSerializable):
                     deployment_name = yaml_conf.name
@@ -238,7 +239,8 @@ class Vindaloo:
                     deployment_name = yaml_conf.get('config', {}).get('ident_label', '')
                 if deployment_name:
                     self._out('Waiting for rollout {} to finish'.format(deployment_name))
-                    self.cmd(["kubectl", "rollout", "status", "deployment", deployment_name])
+                    if not self._cmd_check(["kubectl", "rollout", "status", "deployment", deployment_name]):
+                        failed_deployments.append(deployment_name)
 
             failed_jobs = []
             for yaml_conf in self.config_module.K8S_OBJECTS.get('job', []):
@@ -258,6 +260,8 @@ class Vindaloo:
                             failed_jobs.append(job_name)
                             self._out("Job {} failed.".format(job_name))
 
+            if failed_deployments:
+                self.fail("Vindaloo stopped working due to failed deployments: {}".format(failed_deployments))
             if failed_jobs:
                 self.fail("Vindaloo stopped working due to failed jobs: {}".format(failed_jobs))
 
